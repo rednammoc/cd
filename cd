@@ -1,0 +1,67 @@
+#!/bin/bash
+source "list_utils.sh"
+CD_HISTORY_BASE="$HOME/.cd_history"
+CD_HISTORY_POS=()
+CD_HISTORY_SIZE_MAX=100
+CD_HISTORY_SEP_BY_TERM=true
+
+function cd
+{
+	_cd_init
+	if [ "$1" == "-h" ]
+	then
+		list_enumerate "${CD_HISTORY}"
+	elif [ "$1" == "-r" ]
+	then
+		local index="$2"
+		local entry=$(list_get "${CD_HISTORY}" ${index})
+		[ $? ] && builtin cd "${entry}"
+	elif [ "$1" == "-" ]
+	then
+		if [ ${CD_HISTORY_POS[$$]} -gt 1 ]
+		then
+			CD_HISTORY_POS[$$]=$(expr ${CD_HISTORY_POS[$$]} - 1)
+			cd -r "${CD_HISTORY_POS[$$]}"
+		fi
+	elif [ "$1" == "+" ]
+	then
+		local cd_history_size=$(list_size "${CD_HISTORY}")
+		if [ ${CD_HISTORY_POS[$$]} -lt ${cd_history_size} ] 
+		then
+			CD_HISTORY_POS[$$]=$(expr ${CD_HISTORY_POS[$$]} + 1)
+			cd -r "${CD_HISTORY_POS[$$]}"
+		fi
+	else
+		local lwd=$(pwd)
+		builtin cd "$1"
+		local cwd=$(pwd)
+		if [ "${lwd}" != "${cwd}" ]
+		then
+			list_put "${CD_HISTORY}" "${lwd}"		
+			CD_HISTORY_POS=$(list_size "${CD_HISTORY}")
+			[ ${CD_HISTORY_POS[$$]} -gt "${CD_HISTORY_SIZE_MAX}" ] && list_delete "${CD_HISTORY}" "1"
+		fi
+	fi
+}
+
+function _cd_init
+{
+	local list_size=$(list_size "${CD_HISTORY}")
+	if [ -z "${CD_HISTORY_POS[$$]}" ] 
+	then
+		if [ -f "${CD_HISTORY}" ]
+		then
+			CD_HISTORY_POS[$$]=${list_size}
+		else
+			CD_HISTORY_POS[$$]=1
+		fi
+	else
+		if [ "${CD_HISTORY_POS[$$]}" -gt "${list_size}" ] 
+		then
+			CD_HISTORY_POS[$$]=${list_size}
+		fi
+	fi
+	CD_HISTORY=${CD_HISTORY_BASE}
+	[ "${CD_HISTORY_SEP_BY_TERM}" ] && CD_HISTORY="${CD_HISTORY}.$$"
+}
+
