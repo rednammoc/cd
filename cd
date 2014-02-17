@@ -7,29 +7,34 @@ CD_HISTORY_SEP_BY_TERM=true
 
 function cd
 {
-	_cd_init
+	local list=$(cd_history_get_list)
 	if [ "$1" == "-h" ]
 	then
-		list_enumerate "${CD_HISTORY}"
+		list_enumerate "${list}"
 	elif [ "$1" == "-r" ]
 	then
 		local index="$2"
-		local entry=$(list_get "${CD_HISTORY}" ${index})
-		[ $? ] && builtin cd "${entry}"
+		if [ "${index}" -gt 0 ] && [ "${index}" -lt $(list_size "${list}") ] ; then
+			CD_HISTORY_POS[$$]=$index
+			local entry=$(list_get "${list}" "${index}")
+			[ $? ] && builtin cd "${entry}"
+		fi
 	elif [ "$1" == "-" ]
 	then
-		if [ ${CD_HISTORY_POS[$$]} -gt 1 ]
+		local index=$(cd_history_get_pos "${list}" $$)
+		if [ "${index}" -gt 1 ]
 		then
-			CD_HISTORY_POS[$$]=$(expr ${CD_HISTORY_POS[$$]} - 1)
-			cd -r "${CD_HISTORY_POS[$$]}"
+			index=$(expr ${index} - 1)
+			cd -r "${index}"
 		fi
 	elif [ "$1" == "+" ]
 	then
-		local cd_history_size=$(list_size "${CD_HISTORY}")
-		if [ ${CD_HISTORY_POS[$$]} -lt ${cd_history_size} ] 
+		local index=$(cd_history_get_pos "${list}" $$)
+		local size=$(list_size "${list}")
+		if [ ${index} -lt ${size} ] 
 		then
-			CD_HISTORY_POS[$$]=$(expr ${CD_HISTORY_POS[$$]} + 1)
-			cd -r "${CD_HISTORY_POS[$$]}"
+			index=$(expr ${index} + 1)
+			cd -r "${index}"
 		fi
 	else
 		local lwd=$(pwd)
@@ -37,31 +42,36 @@ function cd
 		local cwd=$(pwd)
 		if [ "${lwd}" != "${cwd}" ]
 		then
-			list_put "${CD_HISTORY}" "${lwd}"		
-			CD_HISTORY_POS=$(list_size "${CD_HISTORY}")
-			[ ${CD_HISTORY_POS[$$]} -gt "${CD_HISTORY_SIZE_MAX}" ] && list_delete "${CD_HISTORY}" "1"
+			# Add directory to list and remove first entry as long as index max-size is reached.
+			list_put "${list}" "${lwd}"		
+			while [ $(list_size "${list}") -gt "${CD_HISTORY_SIZE_MAX}" ]
+			do
+				list_delete "${list}" "1"
+			done
 		fi
 	fi
 }
 
-function _cd_init
+function cd_history_get_pos
 {
-	local list_size=$(list_size "${CD_HISTORY}")
-	if [ -z "${CD_HISTORY_POS[$$]}" ] 
-	then
-		if [ -f "${CD_HISTORY}" ]
-		then
-			CD_HISTORY_POS[$$]=${list_size}
-		else
-			CD_HISTORY_POS[$$]=1
+	local list="$1"
+	local index="$2"
+	local entry="${CD_HISTORY_POS[$index]}"
+	local pos=1
+	# when no entry defined ...
+	if [ -z "${entry}" ] ; then
+		# check if history file exists ...
+		if [ -f "${list}" ] ; then
+			# and set pos to end of list.
+			pos=$(list_size "${list}")
 		fi
-	else
-		if [ "${CD_HISTORY_POS[$$]}" -gt "${list_size}" ] 
-		then
-			CD_HISTORY_POS[$$]=${list_size}
-		fi
-	fi
-	CD_HISTORY=${CD_HISTORY_BASE}
-	[ "${CD_HISTORY_SEP_BY_TERM}" ] && CD_HISTORY="${CD_HISTORY}.$$"
+	else pos="$entry"; fi
+	echo ${pos}
 }
 
+function cd_history_get_list
+{
+	local list=${CD_HISTORY_BASE}
+	[ "${CD_HISTORY_SEP_BY_TERM}" ] && list="${CD_HISTORY}.$$"
+	echo "${list}"
+}
