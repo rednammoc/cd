@@ -1,5 +1,19 @@
 #!/bin/bash
-source "list_utils.sh"
+APP_NAME="cd"
+APP_DESCRIPTION="Extends builtin cd-command with traverseable history."
+APP_DIR=${BASH_SOURCE%/*}
+APP_VERSION="0.1"
+APP_AUTHOR="rednammoc"
+APP_AUTHOR_EMAIL="rednammoc@gmx.de"
+
+# Load bash-utils core.
+if [[ ! -d "$APP_DIR" ]]; then APP_DIR="$PWD"; fi
+BASH_UTILS_DIR="${APP_DIR}/lib/bash-utils/src/utils"
+source "${BASH_UTILS_DIR}/core_utils.sh"
+
+# Require utils.
+require "list_utils.sh"
+
 CD_HISTORY_BASE="$HOME/.cd_history"
 CD_HISTORY_POS=()
 CD_HISTORY_SIZE_MAX=100
@@ -7,35 +21,15 @@ CD_HISTORY_SEP_BY_TERM=true
 
 function cd
 {
-	local list=$(cd_history_get_list)
-	if [ "$1" == "-h" ]
+	local list=$(cd_history_list_get)
+	if [ "$1" == "-" ]
 	then
-		list_enumerate "${list}"
-	elif [ "$1" == "-r" ]
-	then
-		local index="$2"
-		if [ "${index}" -gt 0 ] && [ "${index}" -lt $(list_size "${list}") ] ; then
-			CD_HISTORY_POS[$$]=$index
-			local entry=$(list_get "${list}" "${index}")
-			[ $? ] && builtin cd "${entry}"
-		fi
-	elif [ "$1" == "-" ]
-	then
-		local index=$(cd_history_get_pos "${list}" $$)
-		if [ "${index}" -gt 1 ]
-		then
-			index=$(expr ${index} - 1)
-			cd -r "${index}"
-		fi
+		local dir=$(cd_history_dir_prev)
+		! [ -z "${dir}" ] && builtin cd "${dir}"
 	elif [ "$1" == "+" ]
 	then
-		local index=$(cd_history_get_pos "${list}" $$)
-		local size=$(list_size "${list}")
-		if [ ${index} -lt ${size} ] 
-		then
-			index=$(expr ${index} + 1)
-			cd -r "${index}"
-		fi
+		local dir=$(cd_history_dir_next)
+		! [ -z "${dir}" ] && builtin cd "${dir}"
 	else
 		local lwd=$(pwd)
 		builtin cd "$1"
@@ -52,24 +46,113 @@ function cd
 	fi
 }
 
-function cd_history_get_pos
+function cd_history
 {
-	local list="$1"
-	local index="$2"
-	local entry="${CD_HISTORY_POS[$index]}"
-	local pos=1
-	# when no entry defined ...
-	if [ -z "${entry}" ] ; then
-		# check if history file exists ...
-		if [ -f "${list}" ] ; then
-			# and set pos to end of list.
-			pos=$(list_size "${list}")
-		fi
-	else pos="$entry"; fi
-	echo ${pos}
+	local list=$(cd_history_list_get)
+	if [ "$1" == "-h" ]
+	then
+		list_enumerate "${list}"
+	elif [ "$1" == "-c" ]
+	then
+		list_clear "${list}"	
+	elif [ "$1" == "-r" ]
+	then
+		local index="$2"
+		cd_history_pos_set "${list}" "${index}" && return 1
+		local dir=$(cd_history_dir_cur)
+		! [ -z "${dir}" ] && builtin cd "${dir}"
+	fi
 }
 
-function cd_history_get_list
+function cd_history_validate
+{
+	# validate list
+	local list=$1
+	! [ -f "$1" ] && return 1
+
+	# validate size
+	local size=$(list_size "${list}")
+	[ "${size}" -eq 0 ] && return 1
+
+	return 0
+}
+
+function cd_history_dir_cur
+{
+	local pos=$(cd_history_pos_cur $1)
+	! [ -z ${pos} ] && $(list_get "$1") 
+}
+
+function cd_history_pos_cur
+{
+	! cd_history_validate $1 && return 1
+	local list="$1"
+	cd_history_pos_get "${list}"
+}
+
+function cd_history_dir_next
+{
+	local pos=$(cd_history_pos_next $1)
+	! [ -z ${pos} ] && $(list_get "$1") 
+}
+
+function cd_history_pos_next
+{
+	! cd_history_validate $1 && return 1
+	local list="$1"
+	local size=$(list_size "${list}")
+	local index=$(cd_history_pos_get "${list}")
+	if [ ${index} -lt ${size} ] ; then
+		index=$(expr ${index} + 1)
+	fi
+	echo "${index}" && return 0
+}
+
+function cd_history_dir_prev
+{
+	local pos=$(cd_history_pos_prev $1)
+	! [ -z ${pos} ] && $(list_get "$1") 
+}
+
+function cd_history_pos_prev
+{
+	! cd_history_validate $1 && return 1
+	local list="$1"
+	local size=$(list_size "${list}")
+	local index=$(cd_history_pos_get "${list}")
+	if [ ${index} -gt 1 ] ; then
+		index=$(expr ${index} - 1)
+	fi
+	echo "${index}" && return 0
+}
+
+function cd_history_pos_get
+{
+	! cd_history_validate $1 && return 1
+	local list="$1"
+	local size=$(list_size "$1")
+	local pos="${CD_HISTORY_POS[$$]}"
+	if [ -z "${pos}" ] ; then 
+		pos=${size}
+		CD_HISTORY_POS[$$]=${pos}
+	fi
+	echo ${pos} 		&& return 0
+}
+
+function cd_history_pos_set
+{
+	! cd_history_validate "$1" 	&& return 1
+	local list="$1"
+	local size=$(list_size "$1")
+	local pos="$2"
+	if [ ${pos} -gt 0 ] && [ ${pos} -le ${size} ] ; then
+		CD_HISTORY_POS[$$]=${pos}
+		return 0
+	fi
+ 	return 1
+}
+
+function cd_history_list_get
 {
 	local list=${CD_HISTORY_BASE}
 	[ "${CD_HISTORY_SEP_BY_TERM}" ] && list="${CD_HISTORY}.$$"
