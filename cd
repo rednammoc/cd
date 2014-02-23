@@ -21,27 +21,23 @@ CD_HISTORY_SEP_BY_TERM=true
 
 function cd
 {
-	local list=$(cd_history_list_get)
-	if [ "$1" == "-" ]
+	if [ "$1" == "-" ] || [ "$1" == "+" ]
 	then
-		local dir=$(cd_history_dir_prev)
-		! [ -z "${dir}" ] && builtin cd "${dir}"
-	elif [ "$1" == "+" ]
-	then
-		local dir=$(cd_history_dir_next)
-		! [ -z "${dir}" ] && builtin cd "${dir}"
+		cd_history "$1"
 	else
-		local lwd=$(pwd)
-		builtin cd "$1"
+		local list=$(cd_history_list_get)
+		local lwd=$(cd_history_dir_cur "${list}")
+		if [ -z "$1" ] ; then builtin cd; else builtin cd "$1"; fi
 		local cwd=$(pwd)
 		if [ "${lwd}" != "${cwd}" ]
 		then
 			# Add directory to list and remove first entry as long as index max-size is reached.
-			list_put "${list}" "${lwd}"		
-			while [ $(list_size "${list}") -gt "${CD_HISTORY_SIZE_MAX}" ]
+			list_put "${list}" "${cwd}"		
+			while [ $(list_size "${list}") -gt ${CD_HISTORY_SIZE_MAX} ]
 			do
 				list_delete "${list}" "1"
 			done
+			cd_history_pos_set "${list}" $(list_size "${list}")
 		fi
 	fi
 }
@@ -51,7 +47,9 @@ function cd_history
 	local list=$(cd_history_list_get)
 	if [ "$1" == "-h" ]
 	then
-		list_enumerate "${list}"
+		local index=$(cd_history_pos_get "${list}")
+		list_enumerate "${list}" "${index}"
+		echo "{ profile: ${list}, size: $(list_size ${list}) }"
 	elif [ "$1" == "-c" ]
 	then
 		list_clear "${list}"	
@@ -61,6 +59,18 @@ function cd_history
 		cd_history_pos_set "${list}" "${index}" && return 1
 		local dir=$(cd_history_dir_cur)
 		! [ -z "${dir}" ] && builtin cd "${dir}"
+	elif [ "$1" == "+" ] || [ "$1" == "-" ]
+	then
+		local pos=""
+		[ "$1" == "+" ] && pos=$(cd_history_pos_next "${list}")
+		[ "$1" == "-" ] && pos=$(cd_history_pos_prev "${list}")
+		if ! [ -z "${pos}" ]
+		then
+			local dir=$(list_get "${list}" "${pos}")
+			builtin cd "${dir}"
+			cd_history_pos_set "${list}" "${pos}"
+			return 0
+		fi
 	fi
 }
 
@@ -77,23 +87,12 @@ function cd_history_validate
 	return 0
 }
 
-function cd_history_dir_cur
-{
-	local pos=$(cd_history_pos_cur $1)
-	! [ -z ${pos} ] && $(list_get "$1") 
-}
-
 function cd_history_pos_cur
 {
 	! cd_history_validate $1 && return 1
 	local list="$1"
 	cd_history_pos_get "${list}"
-}
-
-function cd_history_dir_next
-{
-	local pos=$(cd_history_pos_next $1)
-	! [ -z ${pos} ] && $(list_get "$1") 
+	return 0
 }
 
 function cd_history_pos_next
@@ -106,12 +105,6 @@ function cd_history_pos_next
 		index=$(expr ${index} + 1)
 	fi
 	echo "${index}" && return 0
-}
-
-function cd_history_dir_prev
-{
-	local pos=$(cd_history_pos_prev $1)
-	! [ -z ${pos} ] && $(list_get "$1") 
 }
 
 function cd_history_pos_prev
@@ -136,15 +129,15 @@ function cd_history_pos_get
 		pos=${size}
 		CD_HISTORY_POS[$$]=${pos}
 	fi
-	echo ${pos} 		&& return 0
+	echo ${pos} && return 0
 }
 
 function cd_history_pos_set
 {
 	! cd_history_validate "$1" 	&& return 1
 	local list="$1"
+	local pos=$2
 	local size=$(list_size "$1")
-	local pos="$2"
 	if [ ${pos} -gt 0 ] && [ ${pos} -le ${size} ] ; then
 		CD_HISTORY_POS[$$]=${pos}
 		return 0
@@ -155,6 +148,6 @@ function cd_history_pos_set
 function cd_history_list_get
 {
 	local list=${CD_HISTORY_BASE}
-	[ "${CD_HISTORY_SEP_BY_TERM}" ] && list="${CD_HISTORY}.$$"
-	echo "${list}"
+	[ "${CD_HISTORY_SEP_BY_TERM}" ] && list="${list}.$$"
+	echo "${list}" && return 0
 }
