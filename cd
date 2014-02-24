@@ -7,9 +7,10 @@ APP_AUTHOR="rednammoc"
 APP_AUTHOR_EMAIL="rednammoc@gmx.de"
 
 # Load bash-utils core.
-if [[ ! -d "$APP_DIR" ]]; then APP_DIR="$PWD"; fi
+[ ! -d "$APP_DIR" ] && APP_DIR="$PWD"
 BASH_UTILS_DIR="${APP_DIR}/lib/bash-utils/src/utils"
-source "${BASH_UTILS_DIR}/core_utils.sh"
+BASH_UTILS_CORE="${BASH_UTILS_DIR}/core_utils.sh"
+source "${BASH_UTILS_CORE}" || return 1
 
 # Require utils.
 require "list_utils.sh"
