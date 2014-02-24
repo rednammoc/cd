@@ -25,19 +25,25 @@ function cd
 	then
 		cd_history "$1"
 	else
-		local list=$(cd_history_list_get)
-		local lwd=$(cd_history_dir_cur "${list}")
+		local lwd=$(pwd)
 		if [ -z "$1" ] ; then builtin cd; else builtin cd "$1"; fi
 		local cwd=$(pwd)
 		if [ "${lwd}" != "${cwd}" ]
 		then
-			# Add directory to list and remove first entry as long as index max-size is reached.
-			list_put "${list}" "${cwd}"		
-			while [ $(list_size "${list}") -gt ${CD_HISTORY_SIZE_MAX} ]
+			local list=$(cd_history_list_get)
+			local list_size=$(list_size "${list}")
+			local pos=$(expr $(cd_history_pos_cur "${list}") + 1)
+			# When history is empty add the starting directory as well.
+			[ ${list_size} -eq 0 ] && list_put "${list}" "${lwd}" && list_size=$(expr ${list_size} + 1) && pos=$(expr ${pos} + 1)
+			# Add current directory to history and preserve order.
+			list_put "${list}" "${cwd}" "${pos}"	
+			# Remove first entry as long as history is greater than max-size.
+			while [ ${list_size} -gt ${CD_HISTORY_SIZE_MAX} ]
 			do
 				list_delete "${list}" "1"
+				list_size=$(expr ${list_size} - 1)
 			done
-			cd_history_pos_set "${list}" $(list_size "${list}")
+			cd_history_pos_set "${list}" "${pos}"
 		fi
 	fi
 }
@@ -45,14 +51,18 @@ function cd
 function cd_history
 {
 	local list=$(cd_history_list_get)
-	if [ "$1" == "-h" ]
+	if [ "$1" == "-l" ]
 	then
-		local index=$(cd_history_pos_get "${list}")
-		list_enumerate "${list}" "${index}"
+		if [ -f "${list}" ]
+		then
+			local index=$(cd_history_pos_get "${list}")
+			list_enumerate "${list}" "${index}"
+		fi
 		echo "{ profile: ${list}, size: $(list_size ${list}) }"
 	elif [ "$1" == "-c" ]
 	then
 		list_clear "${list}"	
+		cd_history_pos_set "${list}" 0
 	elif [ "$1" == "-r" ]
 	then
 		local index="$2"
@@ -71,6 +81,19 @@ function cd_history
 			cd_history_pos_set "${list}" "${pos}"
 			return 0
 		fi
+	elif [ "$1" == "-h" ] || [ "$1" == "--help" ]
+	then
+		cat <<EOM
+Usage: ${APP_NAME} [options]
+            
+Options:
+  -                go to previous #position.
+  +                go to next #position.
+  -c               clear history.
+  -l               list history and highlight current position.
+  -r [position]    go to directory at #position.
+  -h, --help       show this help message and exit.
+EOM
 	fi
 }
 
@@ -85,6 +108,13 @@ function cd_history_validate
 	[ "${size}" -eq 0 ] && return 1
 
 	return 0
+}
+
+function cd_history_dir_cur
+{
+	local list="$1"
+	local pos=$(cd_history_pos_cur "${list}")
+	! [ -z "${pos}" ] && list_get "${list}" "${pos}"
 }
 
 function cd_history_pos_cur
@@ -138,11 +168,17 @@ function cd_history_pos_set
 	local list="$1"
 	local pos=$2
 	local size=$(list_size "$1")
-	if [ ${pos} -gt 0 ] && [ ${pos} -le ${size} ] ; then
+	if [ ${pos} -le 0 ] ; then
+		CD_HISTORY_POS[$$]=1
+	elif [ ${pos} -le ${size} ] ; then
 		CD_HISTORY_POS[$$]=${pos}
-		return 0
+	elif [ ${pos} -gt ${size} ] ; then
+		CD_HISTORY_POS[$$]=${size}
+	else
+		echo "Unknown Error."
+		return 1
 	fi
- 	return 1
+ 	return 0
 }
 
 function cd_history_list_get
