@@ -1,0 +1,160 @@
+#!/bin/bash
+APP_NAME="cd_history"
+APP_DESCRIPTION="Manageable traverseable history."
+APP_DIR=${BASH_SOURCE%/*}
+APP_VERSION="0.1"
+APP_AUTHOR="rednammoc"
+APP_AUTHOR_EMAIL="rednammoc@gmx.de"
+
+# Load bash-utils core.
+if [[ ! -d "$APP_DIR" ]]; then APP_DIR="$PWD"; fi
+BASH_UTILS_DIR="${APP_DIR}/lib/bash-utils/src/utils"
+source "${BASH_UTILS_DIR}/core_utils.sh"
+
+# Require utils.
+require "list_utils.sh"
+
+CD_HISTORY_BASE="$HOME/.cd_history"
+CD_HISTORY_POS=()
+CD_HISTORY_SIZE_MAX=100
+CD_HISTORY_SEP_BY_TERM=true
+
+function cd_history
+{
+	local list=$(cd_history_list_get)
+	if [ "$1" == "-l" ]
+	then
+		if [ -f "${list}" ]
+		then
+			local index=$(cd_history_pos_get "${list}")
+			list_enumerate "${list}" "${index}"
+		fi
+		echo "{ profile: ${list}, size: $(list_size ${list}) }"
+	elif [ "$1" == "-c" ]
+	then
+		list_clear "${list}"	
+		cd_history_pos_set "${list}" 0
+	elif [ "$1" == "-r" ]
+	then
+		local index="$2"
+		cd_history_pos_set "${list}" "${index}" && return 1
+		local dir=$(cd_history_dir_cur)
+		! [ -z "${dir}" ] && builtin cd "${dir}"
+	elif [ "$1" == "+" ] || [ "$1" == "-" ]
+	then
+		local pos=""
+		[ "$1" == "+" ] && pos=$(cd_history_pos_next "${list}")
+		[ "$1" == "-" ] && pos=$(cd_history_pos_prev "${list}")
+		if ! [ -z "${pos}" ]
+		then
+			local dir=$(list_get "${list}" "${pos}")
+			builtin cd "${dir}"
+			cd_history_pos_set "${list}" "${pos}"
+			return 0
+		fi
+	elif [ "$1" == "-h" ] || [ "$1" == "--help" ]
+	then
+		cat <<EOM
+Usage: ${APP_NAME} [options]
+            
+Options:
+  -                go to previous #position.
+  +                go to next #position.
+  -c               clear history.
+  -l               list history and highlight current position.
+  -r [position]    go to directory at #position.
+  -h, --help       show this help message and exit.
+EOM
+	fi
+}
+
+function cd_history_validate
+{
+	# validate list
+	local list=$1
+	! [ -f "$1" ] && return 1
+
+	# validate size
+	local size=$(list_size "${list}")
+	[ "${size}" -eq 0 ] && return 1
+
+	return 0
+}
+
+function cd_history_dir_cur
+{
+	local list="$1"
+	local pos=$(cd_history_pos_cur "${list}")
+	! [ -z "${pos}" ] && list_get "${list}" "${pos}"
+}
+
+function cd_history_pos_cur
+{
+	! cd_history_validate $1 && return 1
+	local list="$1"
+	cd_history_pos_get "${list}"
+	return 0
+}
+
+function cd_history_pos_next
+{
+	! cd_history_validate $1 && return 1
+	local list="$1"
+	local size=$(list_size "${list}")
+	local index=$(cd_history_pos_get "${list}")
+	if [ ${index} -lt ${size} ] ; then
+		index=$(expr ${index} + 1)
+	fi
+	echo "${index}" && return 0
+}
+
+function cd_history_pos_prev
+{
+	! cd_history_validate $1 && return 1
+	local list="$1"
+	local size=$(list_size "${list}")
+	local index=$(cd_history_pos_get "${list}")
+	if [ ${index} -gt 1 ] ; then
+		index=$(expr ${index} - 1)
+	fi
+	echo "${index}" && return 0
+}
+
+function cd_history_pos_get
+{
+	! cd_history_validate $1 && return 1
+	local list="$1"
+	local size=$(list_size "$1")
+	local pos="${CD_HISTORY_POS[$$]}"
+	if [ -z "${pos}" ] ; then 
+		pos=${size}
+		CD_HISTORY_POS[$$]=${pos}
+	fi
+	echo ${pos} && return 0
+}
+
+function cd_history_pos_set
+{
+	! cd_history_validate "$1" 	&& return 1
+	local list="$1"
+	local pos=$2
+	local size=$(list_size "$1")
+	if [ ${pos} -le 0 ] ; then
+		CD_HISTORY_POS[$$]=1
+	elif [ ${pos} -le ${size} ] ; then
+		CD_HISTORY_POS[$$]=${pos}
+	elif [ ${pos} -gt ${size} ] ; then
+		CD_HISTORY_POS[$$]=${size}
+	else
+		echo "Unknown Error."
+		return 1
+	fi
+ 	return 0
+}
+
+function cd_history_list_get
+{
+	local list=${CD_HISTORY_BASE}
+	[ "${CD_HISTORY_SEP_BY_TERM}" ] && list="${list}.$$"
+	echo "${list}" && return 0
+}
