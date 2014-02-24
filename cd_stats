@@ -1,0 +1,58 @@
+#!/bin/bash
+APP_NAME="cd_stats"
+APP_DESCRIPTION="Statistical analyse of cd-history."
+APP_DIR=${BASH_SOURCE%/*}
+APP_VERSION="0.1"
+APP_AUTHOR="rednammoc"
+APP_AUTHOR_EMAIL="rednammoc@gmx.de"
+
+# Load bash-utils core.
+if [[ ! -d "$APP_DIR" ]]; then APP_DIR="$PWD"; fi
+BASH_UTILS_DIR="${APP_DIR}/lib/bash-utils/src/utils"
+source "${BASH_UTILS_DIR}/core_utils.sh"
+
+# Require utils.
+require "list_utils.sh"
+
+function cd_stats
+{
+	local option="$2"
+	case "$option" in
+	-t )
+		local file="$1"
+		! [ -f "${file}" ] && echo "Error: File '${file}' does not exist! Abort." && return 1
+		sort "${file}" | uniq -c | sort -r | cut -b 1-8 --complement
+		;;
+	-c )
+		local file="$1"
+		! [ -f "${file}" ] && echo "Error: File '${file}' does not exist! Abort." && return 1
+		sort "${file}" | uniq -c | sort -r
+		;;	
+	*)
+		cat <<EOM
+Usage: ${APP_NAME} <file> [options]
+            
+Options:
+  -t               show list sorted by number of occurences.
+  -c               prefix lines with number of occurences.
+  -h, --help       show this help message and exit.
+EOM
+		return 1
+		;;
+	esac
+}
+
+function cd_stats_sum_print
+{
+	local count="$1"
+	local line="$2"
+	local print_count="$3"
+	if [ "${print_count}" ]
+	then
+		printf "%+6s      %s\n" "${count}" "${line}"
+	else
+		echo "${line}"
+	fi
+}
+
+cd_stats $@
