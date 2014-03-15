@@ -7,7 +7,7 @@ APP_AUTHOR="rednammoc"
 APP_AUTHOR_EMAIL="rednammoc@gmx.de"
 
 # Load bash-utils core.
-[ ! -d "$APP_DIR" ] && APP_DIR="$PWD"
+[ ! -d "${APP_DIR}" ] && APP_DIR="${PWD}"
 BASH_UTILS_DIR="${APP_DIR}/lib/bash-utils/src/utils"
 BASH_UTILS_CORE="${BASH_UTILS_DIR}/core_utils.sh"
 source "${BASH_UTILS_CORE}" || return 1
