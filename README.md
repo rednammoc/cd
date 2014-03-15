@@ -39,7 +39,7 @@ This extension is also shipped with two additional utils.
 
 cdh (cd_history) allows browsing and manipulating the cd-history.  
 
-    Usage: cd_history [options]
+    Usage: cdh [options]
              
     Options:
 	  -                go to previous #position.
