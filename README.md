@@ -4,9 +4,19 @@ Extends builtin cd-command with traverseable history.
 
 ## Install
 
+Clone this repository into your prefered bin-directory (e.g. /home/YOUR_USERNAME/bin).
+
     git clone https://github.com/rednammoc/cd
     git pull
     git submodule update --init --recursive
+
+Within your .bashrc append following code to use the extended cd-command.
+
+    function cd () { /home/YOUR_USERNAME/bin/cd $@; }
+
+Make sure your bin-directory is correctlry added to your PATH-variable within ~/.profiles.
+
+	PATH=$PATH:~/bin
 
 ## Usage
 
@@ -24,20 +34,24 @@ Extends builtin cd-command with traverseable history.
 
 This extension is also shipped with two additional utils.
 
-### cd_history
+### cdh
 
 
-cd_history allows you navigate within cd-history. It is also capable of highlighting the current position in cd-history.  
+cdh (cd_history) allows browsing and manipulating the cd-history.  
 
     Usage: cd_history [options]
              
     Options:
-      -                go to previous #position.
-      +                go to next #position.
-      -c               clear history.
-      -l               list history and highlight current position.
-      -r [position]    go to directory at #position.
-      -h, --help       show this help message and exit.
+	  -                go to previous #position.
+	  +                go to next #position.
+	  -a [path]        add path to history after current position.
+						when no path is specified the current working directory will be added.
+	  -c               clear history.
+	  -d <position>    remove path at #position from history.
+	  -i               show profile-info.
+	  -l               list history and highlight current position.
+	  -r <position>    go to directory at #position.
+	  -h, --help       show this help message and exit.
 
 ### cd_stats
 
