@@ -29,7 +29,6 @@ function cd_history
 			local index=$(cd_history_pos_get "${list}")
 			list_enumerate "${list}" "${index}"
 		fi
-		echo "{ profile: ${list}, size: $(list_size ${list}) }"
 	elif [ "$1" == "-c" ]
 	then
 		list_clear "${list}"	
@@ -52,8 +51,10 @@ function cd_history
 			cd_history_pos_set "${list}" "${pos}"
 			return 0
 		fi
-	elif [ "$1" == "-h" ] || [ "$1" == "--help" ]
+	elif [ "$1" == "-i" ]
 	then
+		echo "{ profile: ${list}, size: $(list_size ${list}) }"
+	else
 		cat <<EOM
 Usage: ${APP_NAME} [options]
             
@@ -61,6 +62,7 @@ Options:
   -                go to previous #position.
   +                go to next #position.
   -c               clear history.
+  -i               show profile-info.
   -l               list history and highlight current position.
   -r [position]    go to directory at #position.
   -h, --help       show this help message and exit.
@@ -158,3 +160,5 @@ function cd_history_list_get
 	[ "${CD_HISTORY_SEP_BY_TERM}" ] && list="${list}.$$"
 	echo "${list}" && return 0
 }
+
+cd_history $@
