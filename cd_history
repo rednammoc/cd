@@ -13,11 +13,14 @@ source "${BASH_UTILS_DIR}/core_utils.sh"
 
 # Require utils.
 require "list_utils.sh"
+require "os_utils.sh"
 
 CD_HISTORY_BASE="$HOME/.cd_history"
-CD_HISTORY_POS=()
 CD_HISTORY_SIZE_MAX=100
 CD_HISTORY_SEP_BY_TERM=true
+
+CD_HISTORY_POS=()
+CD_HISTORY_POS_FILE="$HOME/.cd_history_pos"
 
 function cd_history
 {
@@ -36,7 +39,7 @@ function cd_history
 	elif [ "$1" == "-r" ]
 	then
 		local index="$2"
-		cd_history_pos_set "${list}" "${index}" && return 1
+		cd_history_pos_set "${list}" "${index}" || return 1
 		local dir=$(cd_history_dir_cur)
 		! [ -z "${dir}" ] && builtin cd "${dir}"
 	elif [ "$1" == "+" ] || [ "$1" == "-" ]
@@ -54,7 +57,8 @@ function cd_history
 	elif [ "$1" == "-i" ]
 	then
 		echo "{ profile: ${list}, size: $(list_size ${list}) }"
-	else
+	elif [ "$1" == "-h" ] || [ "$1" == "--help" ]
+	then
 		cat <<EOM
 Usage: ${APP_NAME} [options]
             
@@ -67,6 +71,19 @@ Options:
   -r [position]    go to directory at #position.
   -h, --help       show this help message and exit.
 EOM
+	else
+		echo "$list"
+		if [ -f "${list}" ]
+		then
+			local default_item=$(cd_history_pos_get "${list}")
+			eval `resize`
+			local win_height=$LINES
+			local win_width=$COLUMNS
+			local list_height=$(( $LINES - 8 ))
+			local list=$(list_enumerate "${list}")
+			local selection=$(whiptail --default-item "${default_item}" --menu "Select an entry:" "${win_height}" "${win_width}" "${list_height}" ${list} 3>&1 1>&2 2>&3)
+			cd_history -r "${selection}"
+		fi
 	fi
 }
 
@@ -95,7 +112,6 @@ function cd_history_pos_cur
 	! cd_history_validate $1 && return 1
 	local list="$1"
 	cd_history_pos_get "${list}"
-	return 0
 }
 
 function cd_history_pos_next
@@ -107,7 +123,7 @@ function cd_history_pos_next
 	if [ ${index} -lt ${size} ] ; then
 		index=$(expr ${index} + 1)
 	fi
-	echo "${index}" && return 0
+	echo "${index}"
 }
 
 function cd_history_pos_prev
@@ -119,7 +135,7 @@ function cd_history_pos_prev
 	if [ ${index} -gt 1 ] ; then
 		index=$(expr ${index} - 1)
 	fi
-	echo "${index}" && return 0
+	echo "${index}"
 }
 
 function cd_history_pos_get
@@ -127,12 +143,14 @@ function cd_history_pos_get
 	! cd_history_validate $1 && return 1
 	local list="$1"
 	local size=$(list_size "$1")
-	local pos="${CD_HISTORY_POS[$$]}"
+	local pid=$(pid_leader)
+	[ -f "${CD_HISTORY_POS_FILE}" ] && source "${CD_HISTORY_POS_FILE}"
+	local pos="${CD_HISTORY_POS[${pid}]}"
 	if [ -z "${pos}" ] ; then 
 		pos=${size}
-		CD_HISTORY_POS[$$]=${pos}
+		CD_HISTORY_POS[${pid}]=${pos}
 	fi
-	echo ${pos} && return 0
+	echo ${pos}
 }
 
 function cd_history_pos_set
@@ -141,24 +159,25 @@ function cd_history_pos_set
 	local list="$1"
 	local pos=$2
 	local size=$(list_size "$1")
+	local pid=$(pid_leader)
+	[ -f "${CD_HISTORY_POS_FILE}" ] && source "${CD_HISTORY_POS_FILE}"
 	if [ ${pos} -le 0 ] ; then
-		CD_HISTORY_POS[$$]=1
+		CD_HISTORY_POS[${pid}]=1
 	elif [ ${pos} -le ${size} ] ; then
-		CD_HISTORY_POS[$$]=${pos}
+		CD_HISTORY_POS[${pid}]=${pos}
 	elif [ ${pos} -gt ${size} ] ; then
-		CD_HISTORY_POS[$$]=${size}
+		CD_HISTORY_POS[${pid}]=${size}
 	else
 		echo "Unknown Error."
 		return 1
 	fi
- 	return 0
+	set | grep ^CD_HISTORY_POS= > "${CD_HISTORY_POS_FILE}"
 }
 
 function cd_history_list_get
 {
 	local list=${CD_HISTORY_BASE}
-	[ "${CD_HISTORY_SEP_BY_TERM}" ] && list="${list}.$$"
-	echo "${list}" && return 0
+	[ "${CD_HISTORY_SEP_BY_TERM}" ] && list="${list}.$(pid_leader)"
+	echo "${list}"
 }
-
 cd_history $@
