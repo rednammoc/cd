@@ -29,7 +29,7 @@ else
 	then
 		local history_size=$(cd_history -l | wc -l)
 		# When history is empty add the starting directory as well.
-		[ ${list_size} -eq 0 ] && cd_history -a "${lwd}"
+		[ ${history_size} -eq 0 ] && cd_history -a "${lwd}"
 		# Add current directory to history.
 		cd_history -a "${cwd}"
 	fi
