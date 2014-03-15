@@ -14,33 +14,23 @@ source "${BASH_UTILS_CORE}" || return 1
 
 # Require utils.
 require "list_utils.sh"
-require "cd_history"
 
-function cd
-{
-	if [ "$1" == "-" ] || [ "$1" == "+" ]
+# Check dependencies.
+depends "cd_history"
+
+if [ "$1" == "-" ] || [ "$1" == "+" ]
+then
+	cd_history "$1"
+else
+	local lwd=$(pwd)
+	if [ -z "$1" ] ; then builtin cd; else builtin cd "$1"; fi
+	local cwd=$(pwd)
+	if [ "${lwd}" != "${cwd}" ]
 	then
-		cd_history "$1"
-	else
-		local lwd=$(pwd)
-		if [ -z "$1" ] ; then builtin cd; else builtin cd "$1"; fi
-		local cwd=$(pwd)
-		if [ "${lwd}" != "${cwd}" ]
-		then
-			local list=$(cd_history_list_get)
-			local list_size=$(list_size "${list}")
-			local pos=$(expr $(cd_history_pos_cur "${list}") + 1)
-			# When history is empty add the starting directory as well.
-			[ ${list_size} -eq 0 ] && list_put "${list}" "${lwd}" && list_size=$(expr ${list_size} + 1) && pos=$(expr ${pos} + 1)
-			# Add current directory to history and preserve order.
-			list_put "${list}" "${cwd}" "${pos}"	
-			# Remove first entry as long as history is greater than max-size.
-			while [ ${list_size} -gt ${CD_HISTORY_SIZE_MAX} ]
-			do
-				list_delete "${list}" "1"
-				list_size=$(expr ${list_size} - 1)
-			done
-			cd_history_pos_set "${list}" "${pos}"
-		fi
+		local history_size=$(cd_history -l | wc -l)
+		# When history is empty add the starting directory as well.
+		[ ${list_size} -eq 0 ] && cd_history -a "${lwd}"
+		# Add current directory to history.
+		cd_history -a "${cwd}"
 	fi
-}
+fi
