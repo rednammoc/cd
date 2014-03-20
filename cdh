@@ -1,16 +1,20 @@
 #!/bin/bash
-APP_NAME="cd_history"
+APP_NAME="cdh"
 APP_DESCRIPTION="Manageable traverseable history."
-APP_DIR=${BASH_SOURCE%/*}
+APP_DIR=$(pwd -P)
 APP_VERSION="0.1"
 APP_AUTHOR="rednammoc"
 APP_AUTHOR_EMAIL="rednammoc@gmx.de"
 
 # Load bash-utils core.
-[ ! -d "${APP_DIR}" ] && APP_DIR="${PWD}"
 BASH_UTILS_DIR="${APP_DIR}/lib/bash-utils/src/utils"
 BASH_UTILS_CORE="${BASH_UTILS_DIR}/core_utils.sh"
-source "${BASH_UTILS_CORE}" || return 1
+if [ -f "${BASH_UTILS_CORE}" ] ; then 
+	source "${BASH_UTILS_CORE}"
+else 
+	echo "Error: \"${BASH_UTILS_CORE}\" was not found!"
+	exit 1
+fi
 
 # Require utils.
 require "list_utils.sh"
@@ -100,7 +104,6 @@ Options:
   -h, --help       show this help message and exit.
 EOM
 	else
-		echo "$list"
 		if [ -f "${list}" ]
 		then
 			local default_item=$(cd_history_pos_get "${list}")
