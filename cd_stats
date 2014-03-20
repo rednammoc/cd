@@ -15,45 +15,63 @@ source "${BASH_UTILS_CORE}" || return 1
 # Require utils.
 require "list_utils.sh"
 
-function cd_stats
+function usage
 {
-	local option="$2"
-	case "$option" in
-	-t )
-		local file="$1"
-		! [ -f "${file}" ] && echo "Error: File '${file}' does not exist! Abort." && return 1
-		sort "${file}" | uniq -c | sort -r | cut -b 1-8 --complement
-		;;
-	-c )
-		local file="$1"
-		! [ -f "${file}" ] && echo "Error: File '${file}' does not exist! Abort." && return 1
-		sort "${file}" | uniq -c | sort -r
-		;;	
-	*)
-		cat <<EOM
+	cat <<EOM
 Usage: ${APP_NAME} <file> [options]
-            
+		
 Options:
-  -t               show list sorted by number of occurences.
-  -c               prefix lines with number of occurences.
-  -h, --help       show this help message and exit.
+ -t               show list sorted by number of occurences.
+ -c               prefix lines with number of occurences.
+ -h, --help       show this help message and exit.
 EOM
-		return 1
+}
+
+if [ $? -ne 0 ]
+then
+	usage
+fi
+
+while getopts ":tc" options; do
+	case "$options" in
+	t )
+		SHOW_LIST=1
+		;;
+	c )
+		PREFIX_LINES=1
+		;;	
+	h | help )
+		usage
+		exit 0
+		;;
+	*)
+		usage
+		exit 1
 		;;
 	esac
-}
+done
+shift $((OPTIND - 1))
+FILE="${1}"
 
-function cd_stats_sum_print
-{
-	local count="$1"
-	local line="$2"
-	local print_count="$3"
-	if [ "${print_count}" ]
+if [ "${PREFIX_LINES}" ] && ! [ "${SHOW_LIST}" ]
+then
+	echo "Error: Option -c can not be used alone!"
+	exit 1
+fi
+
+if [ "${SHOW_LIST}" ]
+then
+	if ! [ -f "${FILE}" ]
 	then
-		printf "%+6s      %s\n" "${count}" "${line}"
-	else
-		echo "${line}"
+		echo "Error: File '${FILE}' does not exist! Abort."
+		exit 1
 	fi
-}
+	
+	OUTPUT=$(sort "${FILE}" | uniq -c | sort -r)
+	if ! [ "${PREFIX_LINES}" ]
+	then
+		OUTPUT=$(echo "${OUTPUT}" | cut -b 1-8 --complement)
+	fi
+	echo "${OUTPUT}"
+fi
 
-cd_stats $@
